@@ -12,7 +12,7 @@ pipeline {
     stage('Clone Repo') {
       steps {
         retry(2) {
-          sh 'git config --global http.sslVerify false'
+          bat 'git config --global http.sslVerify false'
           git branch: 'main', url: 'https://github.com/Agammourya15/dockerproject22.git'
         }
       }
@@ -20,26 +20,26 @@ pipeline {
 
     stage('Build Docker Image') {
       steps {
-        sh '''
-          export DOCKER_BUILDKIT=1
-          docker build -t $IMAGE_NAME .
+        bat '''
+          set DOCKER_BUILDKIT=1
+          docker build -t %IMAGE_NAME% .
         '''
       }
     }
 
     stage('Stop Previous Container') {
       steps {
-        sh '''
-          docker stop $CONTAINER_NAME || true
-          docker rm $CONTAINER_NAME || true
+        bat '''
+          docker stop %CONTAINER_NAME% || exit 0
+          docker rm %CONTAINER_NAME% || exit 0
         '''
       }
     }
 
     stage('Run Docker Container') {
       steps {
-        sh '''
-          docker run -d -p $RANDOM_PORT:80 --name $CONTAINER_NAME $IMAGE_NAME
+        bat '''
+          docker run -d -p %RANDOM_PORT%:80 --name %CONTAINER_NAME% %IMAGE_NAME%
         '''
       }
     }
@@ -47,10 +47,10 @@ pipeline {
     stage('Push to Docker Hub') {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhubcreds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-          sh '''
-            echo "$PASS" | docker login -u "$USER" --password-stdin
-            docker tag $IMAGE_NAME $DOCKER_HUB_USER/$IMAGE_NAME:latest
-            docker push $DOCKER_HUB_USER/$IMAGE_NAME:latest
+          bat '''
+            echo %PASS% | docker login -u %USER% --password-stdin
+            docker tag %IMAGE_NAME% %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
+            docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
           '''
         }
       }
@@ -59,7 +59,7 @@ pipeline {
 
   post {
     always {
-      sh '''
+      bat '''
         docker logout
         docker system prune -f --volumes
       '''
