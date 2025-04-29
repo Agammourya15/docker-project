@@ -5,13 +5,16 @@ pipeline {
     IMAGE_NAME = "reactapp"
     DOCKER_HUB_USER = "agammourya"
     RANDOM_PORT = "8081"  // Random port chosen to avoid conflicts
+    CONTAINER_NAME = "${IMAGE_NAME}-${BUILD_NUMBER}"
   }
 
   stages {
     stage('Clone Repo') {
       steps {
-        sh 'git config --global http.sslVerify false'
-        git branch: 'main', url: 'https://github.com/Agammourya15/dockerproject22.git'
+        retry(2) {
+          sh 'git config --global http.sslVerify false'
+          git branch: 'main', url: 'https://github.com/Agammourya15/dockerproject22.git'
+        }
       }
     }
 
@@ -27,8 +30,8 @@ pipeline {
     stage('Stop Previous Container') {
       steps {
         sh '''
-          docker stop $IMAGE_NAME || true
-          docker rm $IMAGE_NAME || true
+          docker stop $CONTAINER_NAME || true
+          docker rm $CONTAINER_NAME || true
         '''
       }
     }
@@ -36,7 +39,7 @@ pipeline {
     stage('Run Docker Container') {
       steps {
         sh '''
-          docker run -d -p $RANDOM_PORT:80 --name $IMAGE_NAME $IMAGE_NAME
+          docker run -d -p $RANDOM_PORT:80 --name $CONTAINER_NAME $IMAGE_NAME
         '''
       }
     }
@@ -65,6 +68,13 @@ pipeline {
       mail to: 'your_email@gmail.com',
            subject: "❌ Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' Failed",
            body: "Oops!\n\nThe Jenkins build '${env.JOB_NAME} [${env.BUILD_NUMBER}]' failed.\n\nCheck the build here: ${env.BUILD_URL}"
+    }
+
+    always {
+      sh '''
+        docker logout
+        docker system prune -f --volumes
+      '''
     }
   }
 }
