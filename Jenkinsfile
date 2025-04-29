@@ -46,7 +46,7 @@ pipeline {
 
     stage('Push to Docker Hub') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+        withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
           bat '''
             echo %PASS% | docker login -u %USER% --password-stdin
             docker tag %IMAGE_NAME% %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
@@ -59,16 +59,19 @@ pipeline {
 
   post {
     success {
-      // Optional: Only works if SMTP is configured properly
-      mail to: 'your_email@gmail.com',
-           subject: "✅ Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' Succeeded",
-           body: "Good news!\n\nThe Jenkins build '${env.JOB_NAME} [${env.BUILD_NUMBER}]' completed successfully.\n\nCheck the build here: ${env.BUILD_URL}"
+      withCredentials([usernamePassword(credentialsId: 'gmailcreds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+        mail to: 'your_email@gmail.com',
+             subject: "✅ Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' Succeeded",
+             body: "Good news!\n\nThe Jenkins build '${env.JOB_NAME} [${env.BUILD_NUMBER}]' completed successfully.\n\nCheck the build here: ${env.BUILD_URL}"
+      }
     }
 
     failure {
-      mail to: 'your_email@gmail.com',
-           subject: "❌ Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' Failed",
-           body: "Oops!\n\nThe Jenkins build '${env.JOB_NAME} [${env.BUILD_NUMBER}]' failed.\n\nCheck the build here: ${env.BUILD_URL}"
+      withCredentials([usernamePassword(credentialsId: 'gmailcreds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+        mail to: 'your_email@gmail.com',
+             subject: "❌ Jenkins Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]' Failed",
+             body: "Oops!\n\nThe Jenkins build '${env.JOB_NAME} [${env.BUILD_NUMBER}]' failed.\n\nCheck the build here: ${env.BUILD_URL}"
+      }
     }
 
     always {
