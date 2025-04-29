@@ -2,16 +2,19 @@ pipeline {
   agent any
 
   environment {
-    IMAGE_NAME = "weathersphere"
-    DOCKER_HUB_USER = "akgreninja"
-    RANDOM_PORT = "8081"  // Random port chosen to avoid conflicts
+    IMAGE_NAME = "reactapp"
+    DOCKER_HUB_USER = "agammourya"
+    RANDOM_PORT = "8081"
+    CONTAINER_NAME = "${IMAGE_NAME}-${BUILD_NUMBER}"
   }
 
   stages {
     stage('Clone Repo') {
       steps {
-        sh 'git config --global http.sslVerify false'
-        git branch: 'main', url: 'https://github.com/akgithubgre/weathersphere.git'
+        retry(2) {
+          sh 'git config --global http.sslVerify false'
+          git branch: 'main', url: 'https://github.com/Agammourya15/dockerproject22.git'
+        }
       }
     }
 
@@ -27,8 +30,8 @@ pipeline {
     stage('Stop Previous Container') {
       steps {
         sh '''
-          docker stop $IMAGE_NAME || true
-          docker rm $IMAGE_NAME || true
+          docker stop $CONTAINER_NAME || true
+          docker rm $CONTAINER_NAME || true
         '''
       }
     }
@@ -36,14 +39,14 @@ pipeline {
     stage('Run Docker Container') {
       steps {
         sh '''
-          docker run -d -p $RANDOM_PORT:80 --name $IMAGE_NAME $IMAGE_NAME
+          docker run -d -p $RANDOM_PORT:80 --name $CONTAINER_NAME $IMAGE_NAME
         '''
       }
     }
 
     stage('Push to Docker Hub') {
       steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+        withCredentials([usernamePassword(credentialsId: 'dockerhubcreds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
           sh '''
             echo "$PASS" | docker login -u "$USER" --password-stdin
             docker tag $IMAGE_NAME $DOCKER_HUB_USER/$IMAGE_NAME:latest
@@ -54,5 +57,12 @@ pipeline {
     }
   }
 
-  
+  post {
+    always {
+      sh '''
+        docker logout
+        docker system prune -f --volumes
+      '''
+    }
+  }
 }
