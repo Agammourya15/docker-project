@@ -22,7 +22,7 @@ pipeline {
       steps {
         bat '''
           set DOCKER_BUILDKIT=1
-          docker build -t ${IMAGE_NAME} .
+          docker build -t %IMAGE_NAME% .
         '''
       }
     }
@@ -30,8 +30,8 @@ pipeline {
     stage('Stop Previous Container') {
       steps {
         bat '''
-          docker stop ${CONTAINER_NAME} || exit 0
-          docker rm ${CONTAINER_NAME} || exit 0
+          docker stop %CONTAINER_NAME% || exit 0
+          docker rm %CONTAINER_NAME% || exit 0
         '''
       }
     }
@@ -39,7 +39,7 @@ pipeline {
     stage('Run Docker Container') {
       steps {
         bat '''
-          docker run -d -p ${RANDOM_PORT}:80 --name ${CONTAINER_NAME} ${IMAGE_NAME}
+          docker run -d -p %RANDOM_PORT%:80 --name %CONTAINER_NAME% %IMAGE_NAME%
         '''
       }
     }
@@ -48,9 +48,9 @@ pipeline {
       steps {
         withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
           bat '''
-            echo ${PASS} | docker login -u ${USER} --password-stdin
-            docker tag ${IMAGE_NAME} ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest
-            docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest
+            echo %PASS% | docker login -u %USER% --password-stdin
+            docker tag %IMAGE_NAME% %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
+            docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
           '''
         }
       }
