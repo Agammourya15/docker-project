@@ -69,70 +69,61 @@
 
 
 pipeline {
-  agent any
+    agent any
 
-  environment {
-    IMAGE_NAME = "reactapp"
-    DOCKER_HUB_USER = "agammourya"
-    CONTAINER_NAME = "${IMAGE_NAME}-${BUILD_NUMBER}"
-  }
+    environment {
+        IMAGE_NAME = "reactapp"
+        DOCKER_HUB_USER = "agammourya"
+        CONTAINER_NAME = "${IMAGE_NAME}-${BUILD_NUMBER}"
+        PORT = "5173"
+    }
 
-  stages {
-    stage('Clone Repo') {
-      steps {
-        retry(2) {
-          bat 'git config --global http.sslVerify false'
-          git branch: 'main', url: 'https://github.com/Agammourya15/dockerproject22.git'
+    stages {
+        stage('Clone Repository') {
+            steps {
+                git branch: 'main', 
+                    url: 'https://github.com/Agammourya15/dockerproject22.git'
+            }
         }
-      }
-    }
 
-    stage('Build Docker Image') {
-      steps {
-        bat '''
-          set DOCKER_BUILDKIT=1
-          docker build -t %IMAGE_NAME% .
-        '''
-      }
-    }
-
-    stage('Stop Previous Container') {
-      steps {
-        bat '''
-          docker stop %CONTAINER_NAME% || exit 0
-          docker rm %CONTAINER_NAME% || exit 0
-        '''
-      }
-    }
-
-    stage('Run Docker Container') {
-      steps {
-        bat '''
-          docker run -d --name %CONTAINER_NAME% %IMAGE_NAME%
-        '''
-      }
-    }
-
-    stage('Push to Docker Hub') {
-      steps {
-        withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-          bat '''
-            echo %PASS% | docker login -u %USER% --password-stdin
-            docker tag %IMAGE_NAME% %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
-            docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
-          '''
+        stage('Build and Push Docker Image') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    bat """
+                        echo %PASS% | docker login -u %USER% --password-stdin
+                        docker-compose build
+                        docker tag ${IMAGE_NAME} ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest
+                        docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest
+                    """
+                }
+            }
         }
-      }
-    }
-  }
 
-  post {
-    always {
-      bat '''
-        docker logout
-        docker system prune -f --volumes
-      '''
+        stage('Deploy with Docker Compose') {
+            steps {
+                bat """
+                    docker-compose down || exit 0
+                    docker-compose up -d
+                """
+            }
+        }
+
+        stage('Health Check') {
+            steps {
+                // Wait for application to start
+                bat "timeout /t 30"
+                bat "curl http://localhost:${PORT} || echo 'Application health check'"
+            }
+        }
     }
-  }
+
+    post {
+        always {
+            bat """
+                docker-compose down
+                docker logout
+                docker system prune -f
+            """
+        }
+    }
 }
-
