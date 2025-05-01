@@ -32,7 +32,7 @@ pipeline {
                 script {
                     withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
                         bat """
-                            echo %PASSWORD% | docker login -u %USERNAME% --password-stdin
+                            docker login -u %USERNAME% -p %PASSWORD%
                             docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest
                         """
                     }
@@ -52,7 +52,6 @@ pipeline {
 
         stage('Deploy Container') {
             steps {
-                // Stop and remove existing containers
                 bat """
                     docker stop ${CONTAINER_NAME} || exit 0
                     docker rm ${CONTAINER_NAME} || exit 0
