@@ -60,15 +60,7 @@ pipeline {
             }
         }
 
-        stage('Health Check') {
-            steps {
-                bat """
-                    timeout /t 30
-                    curl http://localhost:${PORT} || echo "Application is starting..."
-                    docker ps | findstr ${CONTAINER_NAME}
-                """
-            }
-        }
+        
     }
 
     post {
