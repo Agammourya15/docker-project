@@ -1,85 +1,70 @@
 pipeline {
-    agent any
+  agent any
 
-    environment {
-        DOCKER_CREDENTIALS = credentials('dockerhubcred')
-        IMAGE_NAME = "reactapp"
-        DOCKER_HUB_USER = "agammourya"
-        PORT = "5173"
-        CONTAINER_NAME = "${IMAGE_NAME}-${BUILD_NUMBER}"
+  environment {
+    IMAGE_NAME = "reactapp"
+    DOCKER_HUB_USER = "agammourya"
+    HOST_PORT = "5173"
+    CONTAINER_PORT = "5173"
+    CONTAINER_NAME = "${IMAGE_NAME}-${BUILD_NUMBER}"
+  }
+
+  stages {
+    stage('Clone Repo') {
+      steps {
+        retry(2) {
+          bat 'git config --global http.sslVerify false'
+          git branch: 'main', url: 'https://github.com/Agammourya15/dockerproject22.git'
+        }
+      }
     }
 
-    stages {
-        stage('Checkout') {
-            steps {
-                git branch: 'main', 
-                    url: 'https://github.com/Agammourya15/dockerproject22.git'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    bat """
-                        docker build --no-cache=false --pull=true -t ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest .
-                    """
-                }
-            }
-        }
-
-        stage('Push to Docker Hub') {
-            steps {
-                script {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                        bat """
-                            docker login -u %USERNAME% -p %PASSWORD%
-                            docker push ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Verify Image') {
-            steps {
-                script {
-                    sh '''
-                        docker images | grep reactapp
-                        echo "Verifying image is pushed to Docker Hub..."
-                        docker pull agammourya/reactapp:latest
-                    '''
-                }
-            }
-        }
-
-        stage('Deploy Container') {
-            steps {
-                script {
-                    sh 'docker-compose -f docker-compose.yml up -d'
-                }
-            }
-        }
+    stage('Build Docker Image') {
+      steps {
+        bat '''
+          set DOCKER_BUILDKIT=1
+          docker build -t %IMAGE_NAME% .
+        '''
+      }
     }
 
-    post {
-        always {
-            sh '''
-                docker logout || true
-                docker system prune -f --volumes
-            '''
-            cleanWs()
-        }
-        success {
-            echo '✅ Pipeline succeeded! React app is deployed and running.'
-        }
-        failure {
-            sh '''
-                docker stop ${CONTAINER_NAME} || true
-                docker rm ${CONTAINER_NAME} || true
-                docker rmi ${DOCKER_HUB_USER}/${IMAGE_NAME}:latest || true
-            '''
-            echo '❌ Pipeline failed. Check logs for details.'
-        }
+    stage('Stop Container on Port 5173') {
+      steps {
+        bat '''
+          docker ps -q --filter "publish=5173" > tmp.txt
+          for /f %%i in (tmp.txt) do docker stop %%i & docker rm %%i
+          del tmp.txt
+        '''
+      }
     }
+
+    stage('Run Docker Container') {
+      steps {
+        bat '''
+          docker run -d -p %HOST_PORT%:%CONTAINER_PORT% --name %CONTAINER_NAME% %IMAGE_NAME%
+        '''
+      }
+    }
+
+    stage('Push to Docker Hub') {
+      steps {
+        withCredentials([usernamePassword(credentialsId: 'dockerhubcred', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+          bat '''
+            echo %PASS% | docker login -u %USER% --password-stdin
+            docker tag %IMAGE_NAME% %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
+            docker push %DOCKER_HUB_USER%/%IMAGE_NAME%:latest
+          '''
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      bat '''
+        docker logout
+        docker system prune -f --volumes
+      '''
+    }
+  }
 }
-
